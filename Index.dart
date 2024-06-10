@@ -146,9 +146,21 @@ class _MyAppState extends State<MyApp> {
                                   onPressed: () async {
                                     final result = await Navigator.push(
                                       context,
-                                      MaterialPageRoute(
-                                          builder: (context) =>
-                                              EditEventPage(event: event)),
+                                      PageRouteBuilder(
+                                        pageBuilder: (context, animation, secondaryAnimation) => EditEventPage(event: event),
+                                        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                                          var begin = Offset(1.0, 0.0);
+                                          var end = Offset.zero;
+                                          var curve = Curves.ease;
+                                          var tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
+                                          var offsetAnimation = animation.drive(tween);
+                                          return SlideTransition(
+                                            position: offsetAnimation,
+                                            child: child,
+                                          );
+                                        },
+                                        transitionDuration: Duration(milliseconds: 300),
+                                      ),
                                     );
                                     if (result != null) {
                                       setState(() {
@@ -181,7 +193,21 @@ class _MyAppState extends State<MyApp> {
         onPressed: () async {
           final result = await Navigator.push(
             context,
-            MaterialPageRoute(builder: (context) => AddEventPage()),
+            PageRouteBuilder(
+              pageBuilder: (context, animation, secondaryAnimation) => AddEventPage(),
+              transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                var begin = Offset(1.0, 0.0);
+                var end = Offset.zero;
+                var curve = Curves.ease;
+                var tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
+                var offsetAnimation = animation.drive(tween);
+                return SlideTransition(
+                  position: offsetAnimation,
+                  child: child,
+                );
+              },
+              transitionDuration: Duration(milliseconds: 300),
+            ),
           );
           if (result != null) {
             setState(() {
