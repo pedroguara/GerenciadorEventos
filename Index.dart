@@ -41,6 +41,7 @@ class _MyAppState extends State<MyApp> {
   List<Event> _filteredEventList = [];
   final TextEditingController _searchController = TextEditingController();
   String _sortOrder = 'asc';
+  int _selectedIndex = 0;
 
   @override
   void initState() {
@@ -76,28 +77,132 @@ class _MyAppState extends State<MyApp> {
     });
   }
 
+  void _onItemTapped(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
+  }
+
+  Future<void> _navigateToAddEventPage() async {
+    final newEvent = await Navigator.push<Event>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AddEventPage(),
+      ),
+    );
+    if (newEvent != null) {
+      setState(() {
+        _eventList.add(newEvent);
+        _filterEvents();
+        _selectedIndex = 0;
+      });
+    }
+  }
+
+  Future<void> _navigateToEditEventPage(Event event, int index) async {
+    final updatedEvent = await Navigator.push<Event>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => EditEventPage(event: event),
+      ),
+    );
+    if (updatedEvent != null) {
+      setState(() {
+        _eventList[index] = updatedEvent;
+        _filterEvents();
+      });
+    }
+  }
+
+  List<Widget> _pages() => [
+        EventListPage(
+          eventList: _eventList,
+          filteredEventList: _filteredEventList,
+          searchController: _searchController,
+          sortOrder: _sortOrder,
+          onSortOrderChanged: (value) {
+            setState(() {
+              _sortOrder = value!;
+              _sortEvents();
+            });
+          },
+          onEventEdited: _navigateToEditEventPage,
+          onEventDeleted: (index) {
+            setState(() {
+              _eventList.removeAt(index);
+              _filterEvents();
+            });
+          },
+        ),
+        Container(), // Placeholder for AddEventPage
+      ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: _pages()[_selectedIndex],
+      bottomNavigationBar: BottomNavigationBar(
+        items: const <BottomNavigationBarItem>[
+          BottomNavigationBarItem(
+            icon: Icon(Icons.list),
+            label: 'Lista de eventos',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.add),
+            label: 'Adicionar Eventos',
+          ),
+        ],
+        currentIndex: _selectedIndex,
+        selectedItemColor: Color(0xFFE6285A),
+        onTap: (index) {
+          if (index == 1) {
+            _navigateToAddEventPage();
+          } else {
+            _onItemTapped(index);
+          }
+        },
+      ),
+    );
+  }
+}
+
+class EventListPage extends StatelessWidget {
+  final List<Event> eventList;
+  final List<Event> filteredEventList;
+  final TextEditingController searchController;
+  final String sortOrder;
+  final ValueChanged<String?> onSortOrderChanged;
+  final Function(Event, int) onEventEdited;
+  final Function(int) onEventDeleted;
+
+  EventListPage({
+    required this.eventList,
+    required this.filteredEventList,
+    required this.searchController,
+    required this.sortOrder,
+    required this.onSortOrderChanged,
+    required this.onEventEdited,
+    required this.onEventDeleted,
+  });
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: Text('Gerenciador de Eventos'),
         actions: [
-          DropdownButton<String>(
-            value: _sortOrder,
-            items: [
-              DropdownMenuItem(value: 'asc', child: Text('Data Ascendente')),
-              DropdownMenuItem(value: 'desc', child: Text('Data Descendente')),
-            ],
-            onChanged: (value) {
-              setState(() {
-                _sortOrder = value!;
-                _sortEvents();
-              });
-            },
-            dropdownColor: Color(0xFF202020),
-            style: TextStyle(color: Color(0xFFE6285A)),
-            underline: Container(),
-            icon: Icon(Icons.sort, color: Color(0xFFE6285A)),
+          DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: sortOrder,
+              items: [
+                DropdownMenuItem(value: 'asc', child: Text('Data Ascendente')),
+                DropdownMenuItem(value: 'desc', child: Text('Data Descendente')),
+              ],
+              onChanged: onSortOrderChanged,
+              dropdownColor: Color(0xFF202020),
+              style: TextStyle(color: Color(0xFFE6285A)),
+              icon: Icon(Icons.sort, color: Color(0xFFE6285A)),
+            ),
           ),
         ],
       ),
@@ -106,7 +211,7 @@ class _MyAppState extends State<MyApp> {
         child: Column(
           children: [
             TextField(
-              controller: _searchController,
+              controller: searchController,
               decoration: InputDecoration(
                 labelText: 'Buscar eventos',
                 border: OutlineInputBorder(),
@@ -115,14 +220,14 @@ class _MyAppState extends State<MyApp> {
             ),
             SizedBox(height: 8),
             Expanded(
-              child: _filteredEventList.isEmpty
+              child: filteredEventList.isEmpty
                   ? Center(
                       child: Text('Nenhum evento encontrado',
                           style: TextStyle(fontSize: 18, color: Colors.white)))
                   : ListView.builder(
-                      itemCount: _filteredEventList.length,
+                      itemCount: filteredEventList.length,
                       itemBuilder: (context, index) {
-                        final event = _filteredEventList[index];
+                        final event = filteredEventList[index];
                         return Card(
                           color: Color(0xFF303030),
                           elevation: 4,
@@ -143,40 +248,14 @@ class _MyAppState extends State<MyApp> {
                               children: <Widget>[
                                 IconButton(
                                   icon: Icon(Icons.edit),
-                                  onPressed: () async {
-                                    final result = await Navigator.push(
-                                      context,
-                                      PageRouteBuilder(
-                                        pageBuilder: (context, animation, secondaryAnimation) => EditEventPage(event: event),
-                                        transitionsBuilder: (context, animation, secondaryAnimation, child) {
-                                          var begin = Offset(1.0, 0.0);
-                                          var end = Offset.zero;
-                                          var curve = Curves.ease;
-                                          var tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
-                                          var offsetAnimation = animation.drive(tween);
-                                          return SlideTransition(
-                                            position: offsetAnimation,
-                                            child: child,
-                                          );
-                                        },
-                                        transitionDuration: Duration(milliseconds: 300),
-                                      ),
-                                    );
-                                    if (result != null) {
-                                      setState(() {
-                                        _eventList[index] = result;
-                                        _filterEvents();
-                                      });
-                                    }
+                                  onPressed: () {
+                                    onEventEdited(event, index);
                                   },
                                 ),
                                 IconButton(
                                   icon: Icon(Icons.delete),
                                   onPressed: () {
-                                    setState(() {
-                                      _eventList.removeAt(index);
-                                      _filterEvents();
-                                    });
+                                    onEventDeleted(index);
                                   },
                                 ),
                               ],
@@ -189,56 +268,8 @@ class _MyAppState extends State<MyApp> {
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          final result = await Navigator.push(
-            context,
-            PageRouteBuilder(
-              pageBuilder: (context, animation, secondaryAnimation) => AddEventPage(),
-              transitionsBuilder: (context, animation, secondaryAnimation, child) {
-                var begin = Offset(1.0, 0.0);
-                var end = Offset.zero;
-                var curve = Curves.ease;
-                var tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
-                var offsetAnimation = animation.drive(tween);
-                return SlideTransition(
-                  position: offsetAnimation,
-                  child: child,
-                );
-              },
-              transitionDuration: Duration(milliseconds: 300),
-            ),
-          );
-          if (result != null) {
-            setState(() {
-              _eventList.add(result);
-              _filterEvents();
-            });
-          }
-        },
-        tooltip: 'Adicionar Evento',
-        child: Icon(Icons.add),
-      ),
     );
   }
-}
-
-class Event {
-  String name;
-  DateTime date;
-  String address;
-  String contractor;
-  int ticketsSold;
-  String classification;
-
-  Event({
-    required this.name,
-    required this.date,
-    required this.address,
-    required this.contractor,
-    required this.ticketsSold,
-    required this.classification,
-  });
 }
 
 class AddEventPage extends StatefulWidget {
@@ -492,4 +523,22 @@ class _EditEventPageState extends State<EditEventPage> {
       });
     }
   }
+}
+
+class Event {
+  String name;
+  DateTime date;
+  String address;
+  String contractor;
+  int ticketsSold;
+  String classification;
+
+  Event({
+    required this.name,
+    required this.date,
+    required this.address,
+    required this.contractor,
+    required this.ticketsSold,
+    required this.classification,
+  });
 }
